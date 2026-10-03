@@ -6,40 +6,73 @@ const mongoose = require('mongoose');
 
 const config = require('./config');
 const connectDB = require('./config/db');
-const { rejectOperators, sameOrigin, isAllowedOrigin, notFoundHandler, errorHandler } = require('./middleware/security');
+const {
+  rejectOperators,
+  sameOrigin,
+  isAllowedOrigin,
+  notFoundHandler,
+  errorHandler
+} = require('./middleware/security');
 
 function createApp() {
   const app = express();
+
   app.disable('x-powered-by');
-  if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+
+  if (process.env.TRUST_PROXY) {
+    app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+  }
 
   app.use(
     helmet({
-      contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
-      crossOriginResourcePolicy: { policy: 'same-site' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"]
+        }
+      },
+      crossOriginResourcePolicy: {
+        policy: 'same-site'
+      }
     })
   );
+
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) callback(null, true);
-        else callback(new Error('Not allowed by CORS'));
+        // Allow requests without an Origin header
+        // such as server-to-server requests and health checks.
+        if (!origin || isAllowedOrigin(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
       },
-      credentials: true,
+      credentials: true
     })
   );
+
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
+
   app.use((req, res, next) => {
-    if (req.body === undefined) req.body = {};
+    if (req.body === undefined) {
+      req.body = {};
+    }
     next();
   });
+
   app.use('/api', sameOrigin, rejectOperators);
 
+  // Health check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'up' : 'down' });
+    res.json({
+      status: 'ok',
+      db: mongoose.connection.readyState === 1 ? 'up' : 'down'
+    });
   });
 
+  // Routes
   app.use('/api/public', require('./routes/publicRoutes'));
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
@@ -54,25 +87,47 @@ function createApp() {
 
   app.use(notFoundHandler);
   app.use(errorHandler);
+
   return app;
 }
 
+// Create the Express application
+const app = createApp();
+
+// Local development
 async function start() {
   await connectDB();
-  const app = createApp();
+
   const server = app.listen(config.port, () => {
-    console.log(`SkillSwap API listening on port ${config.port}`);
+    console.log(
+      `SkillSwap API listening on port ${config.port}`
+    );
   });
-  const shutdown = () => server.close(() => mongoose.connection.close().finally(() => process.exit(0)));
+
+  const shutdown = () => {
+    server.close(() => {
+      mongoose.connection
+        .close()
+        .finally(() => process.exit(0));
+    });
+  };
+
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
 
+// Only start a local HTTP server when running:
+// node server.js
 if (require.main === module) {
   start().catch((err) => {
-    console.error('Failed to start server:', err.message);
+    console.error(
+      'Failed to start server:',
+      err.message
+    );
+
     process.exit(1);
   });
 }
 
-module.exports = { createApp };
+// Export the Express app for Vercel
+module.exports = app;
