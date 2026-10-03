@@ -1,0 +1,23 @@
+module.exports = {
+  CATEGORIES: [
+    'Programming',
+    'Web Development',
+    'Data & AI',
+    'Design',
+    'Video & Photography',
+    'Music',
+    'Languages',
+    'Business',
+    'Marketing',
+    'Writing',
+    'Science & Math',
+    'Cooking',
+    'Fitness & Wellness',
+    'Public Speaking',
+    'Other',
+  ],
+  LEVELS: ['beginner', 'intermediate', 'advanced', 'expert'],
+  MAX_SKILLS_PER_TYPE: 50,
+  PROOF_TYPES: ['pdf', 'png', 'jpg', 'webp'],
+  AVATAR_TYPES: ['png', 'jpg', 'webp'],
+};
