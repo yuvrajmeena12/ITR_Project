@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 
 const config = require('./config');
 const connectDB = require('./config/db');
+
 const {
   rejectOperators,
   sameOrigin,
@@ -20,7 +21,10 @@ function createApp() {
   app.disable('x-powered-by');
 
   if (process.env.TRUST_PROXY) {
-    app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+    app.set(
+      'trust proxy',
+      Number(process.env.TRUST_PROXY) || 1
+    );
   }
 
   app.use(
@@ -41,7 +45,7 @@ function createApp() {
     cors({
       origin: (origin, callback) => {
         // Allow requests without an Origin header
-        // such as server-to-server requests and health checks.
+        // such as health checks and server-to-server requests.
         if (!origin || isAllowedOrigin(origin)) {
           callback(null, true);
         } else {
@@ -62,6 +66,7 @@ function createApp() {
     next();
   });
 
+  // API security middleware
   app.use('/api', sameOrigin, rejectOperators);
 
   // Health check
@@ -72,7 +77,7 @@ function createApp() {
     });
   });
 
-  // Routes
+  // API routes
   app.use('/api/public', require('./routes/publicRoutes'));
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
@@ -85,49 +90,52 @@ function createApp() {
   app.use('/api/notifications', require('./routes/notificationRoutes'));
   app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 
+  // 404 and error handlers
   app.use(notFoundHandler);
   app.use(errorHandler);
 
   return app;
 }
 
-// Create the Express application
-const app = createApp();
-
-// Local development
 async function start() {
-  await connectDB();
+  try {
+    // Connect to MongoDB before starting the server
+    await connectDB();
 
-  const server = app.listen(config.port, () => {
-    console.log(
-      `SkillSwap API listening on port ${config.port}`
-    );
-  });
+    const app = createApp();
 
-  const shutdown = () => {
-    server.close(() => {
-      mongoose.connection
-        .close()
-        .finally(() => process.exit(0));
+    const server = app.listen(config.port, () => {
+      console.log(
+        `SkillSwap API listening on port ${config.port}`
+      );
     });
-  };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-}
+    const shutdown = () => {
+      server.close(() => {
+        mongoose.connection
+          .close()
+          .finally(() => process.exit(0));
+      });
+    };
 
-// Only start a local HTTP server when running:
-// node server.js
-if (require.main === module) {
-  start().catch((err) => {
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+
+  } catch (err) {
     console.error(
       'Failed to start server:',
       err.message
     );
 
     process.exit(1);
-  });
+  }
 }
 
-// Export the Express app for Vercel
-module.exports = app;
+// Start server when running:
+// node server.js
+if (require.main === module) {
+  start();
+}
+
+// Export for testing/reuse
+module.exports = { createApp };
